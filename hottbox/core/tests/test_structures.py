@@ -489,7 +489,7 @@ class TestTensor:
         assert np.array_equal(result, t_a.dot(t_b).data)
 
         # Arbitrary
-        shape = np.random.randint(4, 15, 4)
+        shape = np.random.randint(4, 10, 4)
         arr_a = np.random.randn(*shape)
         arr_b = np.random.randn(*shape[-2:][::-1])
         t_a = Tensor(arr_a)
@@ -508,38 +508,26 @@ class TestTensor:
         with pytest.raises(ValueError):
             _ = t_a.dot(Tensor(arr_b))
 
-        # Inplace
-        t_a.dot(t_b, inplace=True)
-        assert np.array_equal(t_a.data, result)
-
     def test_transpose(self):
         # Default transpose
-        dim = np.random.randint(4, 15)
-        shape = np.random.randint(2, 15, dim)
+        dim = np.random.randint(2, 5)
+        shape = np.random.randint(2, 10, dim)
         arr = np.random.randn(*shape)
-        tt = np.random.randn(arr)
+        tt = Tensor(arr)
         assert np.array_equal(arr.transpose(), tt.transpose().data)
 
         # Test axis parameters
-        dim = np.random.randint(4, 15)
-        shape = np.random.randint(2, 15, dim)
+        dim = np.random.randint(2, 5)
+        shape = np.random.randint(2, 10, dim)
         arr = np.random.randn(*shape)
         tt = Tensor(arr)
         ax = np.arange(dim)
         np.random.shuffle(ax)
-        assert arr.transpose(ax) == tt.transpose(ax).data
-
-        # Wrong input type
-        with pytest.raises(TypeError):
-            tt.transpose()
+        assert np.array_equal(arr.transpose(ax), tt.transpose(ax).data)
 
         # Wrong axis
         with pytest.raises(ValueError):
             tt.transpose(0)
-
-        # Inplace
-        tt.transpose(inplace=True)
-        assert tt.data == arr.transpose()
 
 
     def test_unfold_fold(self):

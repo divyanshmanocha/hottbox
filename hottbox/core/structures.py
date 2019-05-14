@@ -563,8 +563,7 @@ class Tensor(object):
         return self
 
     # TODO: preserve metadata
-    @transpose.setter
-    def transpose(self, inplace=False, *axes):
+    def transpose(self, *axes):
         """ Wrapper for numpy transpose
 
         Returns
@@ -572,16 +571,13 @@ class Tensor(object):
         New instance of Tensor or NoneType
         """
         # Numpy copy
-        ndata = self.data.transpose(*axes)
-        if inplace:
-            self.data = ndata
-        else:
-            warnings.warn("The copy returned does not preserve metdata")
-            return Tensor(ndata)
-        return
+        print(axes)
+        ndata = np.transpose(self.data, *axes)
+        print(ndata.shape)
+        warnings.warn("The copy returned does not preserve metdata")
+        return Tensor(ndata)
     
     # TODO: preserve metadata
-    @dot.setter
     def dot(self, ten, inplace=False):
         """ Wrapper for numpy dot
 
@@ -592,12 +588,8 @@ class Tensor(object):
         if not isinstance(ten, Tensor):
             raise TypeError("``Tensor`` only supports dot multiplication with ``Tensor`` objects.")
         ndata = np.dot(self.data, ten.data)
-        if inplace:
-            self.data = ndata
-        else:
-            warnings.warn("The copy returned does not preserve metdata")
-            return Tensor(ndata)
-        return
+        warnings.warn("The copy returned does not preserve metdata")
+        return Tensor(ndata)
 
     def describe(self):
         """ Expose some metrics """
