@@ -478,6 +478,70 @@ class TestTensor:
         tensor.describe()
         assert captured_output.getvalue() != ''  # to check that something was actually printed
 
+    def test_dot(self):
+        # matrices
+        shape = np.random.randint(4, 15, 2)
+        arr_a = np.random.randn(*shape)
+        arr_b = np.random.randn(*shape[::-1])
+        t_a = Tensor(arr_a)
+        t_b = Tensor(arr_b)
+        result = np.dot(arr_a, arr_b)
+        assert np.array_equal(result, t_a.dot(t_b).data)
+
+        # Arbitrary
+        shape = np.random.randint(4, 15, 4)
+        arr_a = np.random.randn(*shape)
+        arr_b = np.random.randn(*shape[-2:][::-1])
+        t_a = Tensor(arr_a)
+        t_b = Tensor(arr_b)
+        result = np.dot(arr_a, arr_b)
+        assert np.array_equal(result, t_a.dot(t_b).data)
+
+        # Wrong input type
+        with pytest.raises(TypeError):
+            _ = t_a.dot(arr_b)
+
+        # Wrong shape
+        _s = shape[-2:][::-1]
+        _s[0] += 1
+        arr_b = np.random.randn(*_s)
+        with pytest.raises(ValueError):
+            _ = t_a.dot(Tensor(arr_b))
+
+        # Inplace
+        t_a.dot(t_b, inplace=True)
+        assert np.array_equal(t_a.data, result)
+
+    def test_transpose(self):
+        # Default transpose
+        dim = np.random.randint(4, 15)
+        shape = np.random.randint(2, 15, dim)
+        arr = np.random.randn(*shape)
+        tt = np.random.randn(arr)
+        assert np.array_equal(arr.transpose(), tt.transpose().data)
+
+        # Test axis parameters
+        dim = np.random.randint(4, 15)
+        shape = np.random.randint(2, 15, dim)
+        arr = np.random.randn(*shape)
+        tt = Tensor(arr)
+        ax = np.arange(dim)
+        np.random.shuffle(ax)
+        assert arr.transpose(ax) == tt.transpose(ax).data
+
+        # Wrong input type
+        with pytest.raises(TypeError):
+            tt.transpose()
+
+        # Wrong axis
+        with pytest.raises(ValueError):
+            tt.transpose(0)
+
+        # Inplace
+        tt.transpose(inplace=True)
+        assert tt.data == arr.transpose()
+
+
     def test_unfold_fold(self):
         """ Tests for folding and unfolding of a Tensor object """
         shape = (2, 3, 4)

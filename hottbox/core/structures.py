@@ -3,6 +3,7 @@ Classes for different tensor representations
 """
 import itertools
 import numpy as np
+import warnings
 from functools import reduce
 from .operations import unfold, kolda_unfold, fold, kolda_fold, mode_n_product
 from ._meta import Mode, State
@@ -560,6 +561,43 @@ class Tensor(object):
         else:
             self.modes[mode].reset_index()
         return self
+
+    # TODO: preserve metadata
+    @transpose.setter
+    def transpose(self, inplace=False, *axes):
+        """ Wrapper for numpy transpose
+
+        Returns
+        ---------
+        New instance of Tensor or NoneType
+        """
+        # Numpy copy
+        ndata = self.data.transpose(*axes)
+        if inplace:
+            self.data = ndata
+        else:
+            warnings.warn("The copy returned does not preserve metdata")
+            return Tensor(ndata)
+        return
+    
+    # TODO: preserve metadata
+    @dot.setter
+    def dot(self, ten, inplace=False):
+        """ Wrapper for numpy dot
+
+        Returns
+        ---------
+        New instance of Tensor
+        """
+        if not isinstance(ten, Tensor):
+            raise TypeError("``Tensor`` only supports dot multiplication with ``Tensor`` objects.")
+        ndata = np.dot(self.data, ten.data)
+        if inplace:
+            self.data = ndata
+        else:
+            warnings.warn("The copy returned does not preserve metdata")
+            return Tensor(ndata)
+        return
 
     def describe(self):
         """ Expose some metrics """
