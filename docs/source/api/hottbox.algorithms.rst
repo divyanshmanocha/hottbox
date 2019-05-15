@@ -19,6 +19,7 @@ Tensor Decomposition Algorithms
 
     CPD
     RandomisedCPD
+    Parafac2
     HOSVD
     HOOI
     TTSVD
@@ -41,3 +42,4 @@ Multi-linear Classification Algorithms
     LSSTM
     TelVI
     TelVAC
+=======
