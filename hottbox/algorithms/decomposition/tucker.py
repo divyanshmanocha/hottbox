@@ -55,7 +55,7 @@ class HOSVD(BaseTucker):
         If True, enable verbose output
     """
 
-    def __init__(self,  process=(), verbose=False) -> None:
+    def __init__(self, process=(), verbose=False) -> None:
         super(HOSVD, self).__init__(process=process,
                                     verbose=verbose)
 
@@ -75,7 +75,7 @@ class HOSVD(BaseTucker):
         decomposition_name = super(HOSVD, self).name
         return decomposition_name
 
-    def decompose(self, tensor, rank, keep_meta=0):
+    def decompose(self, tensor, rank, efficient_svd=False, keep_meta=0):
         """ Performs tucker decomposition via Higher Order Singular Value Decomposition (HOSVD)
 
         Parameters
@@ -112,7 +112,7 @@ class HOSVD(BaseTucker):
                 fmat[mode] = np.eye(tensor.shape[mode])
                 continue
             tensor_unfolded = unfold(tensor.data, mode)
-            U, _, _, = svd(tensor_unfolded, rank[mode])
+            U, _, _, = svd(tensor_unfolded, rank[mode], arpack=efficient_svd)
             fmat[mode] = U
             core.mode_n_product(U.T, mode=mode)
         tensor_tkd = TensorTKD(fmat=fmat, core_values=core.data)
@@ -201,7 +201,7 @@ class HOOI(BaseTucker):
         decomposition_name = super(HOOI, self).name
         return decomposition_name
 
-    def decompose(self, tensor, rank, keep_meta=0):
+    def decompose(self, tensor, rank, efficient_svd=False, keep_meta=0):
         """ Performs tucker decomposition via Higher Order Orthogonal Iteration (HOOI)
 
         Parameters
@@ -242,7 +242,7 @@ class HOOI(BaseTucker):
                     if mode == i:
                         continue
                     tensor_approx.mode_n_product(fmat.T, mode=mode)
-                fmat_hooi[i], _, _ = svd(tensor_approx.unfold(i).data, rank=rank[i])
+                fmat_hooi[i], _, _ = svd(tensor_approx.unfold(i).data, rank=rank[i], arpack=efficient_svd)
 
             # Update core
             core = tensor.copy()

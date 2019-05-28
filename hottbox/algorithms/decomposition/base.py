@@ -48,13 +48,14 @@ class Decomposition(object):
         raise NotImplementedError('Not implemented in base (Decomposition) class')
 
 
-def svd(matrix, rank=None):
-    """ Computes SVD on matrix
+def svd(matrix, rank=None, arpack=False):
+    """ Computes SVD on matrix. Enable `arpack` for restricted memory.
 
     Parameters
     ----------
     matrix : np.ndarray
     rank : int
+    arpack : 
 
     Returns
     -------
@@ -73,7 +74,10 @@ def svd(matrix, rank=None):
 
     if rank is None or rank >= min_dim:
         # Default on standard SVD
-        U, S, V = scipy.linalg.svd(matrix)
+        if not arpack:
+            U, S, V = scipy.linalg.svd(matrix)
+        else:
+            U, S, V = scipy.sparse.linalg.svds()
         U, S, V = U[:, :rank], S[:rank], V[:rank, :]
         return U, S, V
 
