@@ -483,7 +483,7 @@ class Parafac2(BaseCPD):
         return decomposition_name
 
     # TODO: Parameters differ to base class decomposed - fix
-    def decompose(self, tenl, rank):
+    def decompose(self, tenl, rank, fast_svd=False):
         """ Performs Direct fitting using ALS on a list of tensors of order 2 with respect to the specified ``rank``.
 
         Parameters
@@ -527,6 +527,7 @@ class Parafac2(BaseCPD):
         fmat_h, fmat_v, fmat_s, fmat_u = self._init_fmat(rank, sz)
         cpd_fmat = None
         for n_iter in range(self.max_iter):
+            """
             for k in range(num_t):
                 p, _, q = svd(fmat_h.dot(fmat_s[:, :, k]).dot(fmat_v.T).dot(tenl[k].T), rank=rank[0])
                 fmat_u[k] = q.T.dot(p.T)
@@ -542,8 +543,24 @@ class Parafac2(BaseCPD):
             cpd_fmat = cpd_fmat.dot(np.diag(decomposed_cpd._core_values))
             for k in range(num_t):
                 fmat_s[:, :, k] = np.diag(cpd_fmat[k, :])
+            """
+                    # Randomized SVD for scalability
+            Q = [svd((fmat_h * fmat_s[k]).dot(tenl[k].dot(fmat_v).T), rank=rank[0], arpack=fast_svd) for k in range(num_t)]
+            Q = [(kmat[0].dot(kmat[2])).T for kmat in Q]
+            T = np.array([np.dot(Q[k].T, tenl[k]) for k in range(num_t)])
+            G = [np.identity(rank[0]), np.identity(rank[0]), np.ones((rank[0], rank[0])) * num_t]
 
-            reconstructed = [(fmat_u[k].dot(fmat_h).dot(fmat_s[:, :, k])).dot(fmat_v.T) for k in range(num_t)]
+            # Performing one iteration of CPD
+            fmat_h = np.reshape(np.transpose(T, (0, 2, 1)), (-1, T.shape[1])).T.dot( khatri_rao([fmat_s, fmat_v])).dot(np.linalg.pinv(G[2] * G[1]))
+            G[0] = fmat_h.T.dot(fmat_h)
+            fmat_v = np.reshape(np.transpose(T, (0, 1, 2)), (-1, T.shape[2])).T.dot( khatri_rao([fmat_s, fmat_h])).dot(np.linalg.pinv(G[2] * G[0]))
+            G[1] = fmat_v.T.dot(fmat_v)
+            fmat_s = np.reshape(np.transpose(T, (2, 1, 0)), (-1, T.shape[0])).T.dot( khatri_rao([fmat_v, fmat_h])).dot(np.linalg.pinv(G[1] * G[0]))
+            G[2] = fmat_s.T.dot(fmat_s)
+
+            U = np.array([Q[k].dot(fmat_h) for k in range(num_t)])
+            reconstructed = [((fmat_u[k] * fmat_s[k]).dot(fmat_v.T)) ** 2 for k in range(num_t)]
+            #reconstructed = [(fmat_u[k].dot(fmat_h).dot(fmat_s[:, :, k])).dot(fmat_v.T) for k in range(num_t)]
             err = np.sum([np.sum((tenl[k] - reconstructed[k]) ** 2)
                           for k in range(num_t)])
             self.cost.append(err)
@@ -599,10 +616,12 @@ class Parafac2(BaseCPD):
         modes = modes[:, 0]
         fmat_h = np.identity(rank[0])
         fmat_v = np.random.randn(s_mode, rank[0])
+        """
         fmat_s = np.random.randn(rank[0], rank[0], mode_sz)
-
         for k in range(mode_sz):
             fmat_s[:, :, k] = np.identity(rank[0])
+        """
+        fmat_s = np.random.randn(mode_sz, rank[0])
         fmat_u = np.array([np.random.randn(modes[i], rank[0]) for i in range(mode_sz)])
         if (np.array(modes) < rank[0]).sum() != 0:
             warnings.warn(
