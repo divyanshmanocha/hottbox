@@ -483,7 +483,7 @@ class Parafac2(BaseCPD):
         return decomposition_name
 
     # TODO: Parameters differ to base class decomposed - fix
-    def decompose(self, tenl, rank, fast_svd=False):
+    def decompose(self, tenl, rank, efficient_svd=False):
         """ Performs Direct fitting using ALS on a list of tensors of order 2 with respect to the specified ``rank``.
 
         Parameters
@@ -545,7 +545,7 @@ class Parafac2(BaseCPD):
                 fmat_s[:, :, k] = np.diag(cpd_fmat[k, :])
             """
                     # Randomized SVD for scalability
-            Q = [svd((fmat_h * fmat_s[k]).dot(tenl[k].dot(fmat_v).T), rank=rank[0], arpack=fast_svd) for k in range(num_t)]
+            Q = [svd((fmat_h * fmat_s[k]).dot(tenl[k].dot(fmat_v).T), rank=rank[0], arpack=efficient_svd) for k in range(num_t)]
             Q = [(kmat[0].dot(kmat[2])).T for kmat in Q]
             T = np.array([np.dot(Q[k].T, tenl[k]) for k in range(num_t)])
             G = [np.identity(rank[0]), np.identity(rank[0]), np.ones((rank[0], rank[0])) * num_t]
