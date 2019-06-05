@@ -67,7 +67,7 @@ class CMTF(BaseCPD):
         decomposition_name = super(CMTF, self).name
         return decomposition_name
 
-    def decompose(self, tensor, mlst, rank):
+    def decompose(self, tensor, mlst, rank, fuse_modes=None):
         """ Performs factorisation using ALS on the two instances of ``tensor``
             with respect to the specified ``rank``
 
@@ -77,6 +77,9 @@ class CMTF(BaseCPD):
             Multi-dimensional data to be decomposed
         mlst : List of `Tensor`
             List of two-dimensional `Tensor` to be decomposed
+        fuse_modes : Modes to fuse on
+            List of modes of the tensor corresponding to mlst. If none given, expects
+            len(mlst) to be the same as the `Tensor`.order.
         rank : tuple
             Desired Kruskal rank for the given ``tensor``. Should contain only one value.
             If it is greater then any of dimensions then random initialisation is used
@@ -100,27 +103,38 @@ class CMTF(BaseCPD):
             raise TypeError("Parameter `mlst` should be a list of `Tensor`!")
         if not all(m.order == 2 for m in mlst):
             raise ValueError("All elements of `mlst` should be of order 2. It is a list of matrices!")
+        if fuse_modes is None:
+            fuse_modes = list(range(tensor.order))
+        if len(fuse_modes) != len(mlst):
+            raise ValueError("Must specify the modes at which to fuse the matrices in `mlst`")
 
-        modes = np.array([list(m.shape) for m in mlst])
-        num_modes = len(modes)
-        fmat_a, fmat_b = self._init_fmat(modes[:, 0], modes[:, 1], rank)
+        mat_modes = np.array([list(m.shape) for m in mlst])
+        ten_modes = list(tensor.shape)
+        fmat_a, fmat_b = self._init_fmat(ten_modes, mat_modes[:, 1], rank)
         norm = tensor.frob_norm
         for n_iter in range(self.max_iter):
+            m_iter = 0
             # Update tensor factors
-            for i in range(num_modes):
+            for i in range(len(ten_modes)):
                 _v = hadamard([np.dot(a_i.T, a_i) for k, a_i in enumerate(fmat_a) if k != i])
-                _v += fmat_b[i].T.dot(fmat_b[i])
+                if i in fuse_modes:
+                    _v += fmat_b[m_iter].T.dot(fmat_b[m_iter])
                 kr_result = khatri_rao(fmat_a, skip_matrix=i, reverse=True)
-                _prod_a = np.concatenate([tensor.unfold(i, inplace=False).data, mlst[i].data], axis=1)
-                _prod_b = np.concatenate([kr_result.T, fmat_b[i].T], axis=1).T
+                if i in fuse_modes:
+                    _prod_a = np.concatenate([tensor.unfold(i, inplace=False).data, mlst[m_iter].data], axis=1)
+                    _prod_b = np.concatenate([kr_result.T, fmat_b[m_iter].T], axis=1).T
+                    m_iter += 1
+                else:
+                    _prod_a = tensor.unfold(i, inplace=False).data
+                    _prod_b = kr_result
                 fmat_a[i] = _prod_a.dot(_prod_b).dot(np.linalg.pinv(_v))
-            for i in range(num_modes):
-                fmat_b[i] = mlst[i].data.T.dot(np.linalg.pinv(fmat_a[i]).T)
+            for i, idx in enumerate(fuse_modes):
+                fmat_b[i] = mlst[i].data.T.dot(np.linalg.pinv(fmat_a[idx]).T)
 
-            t_recon, m_recon = self._reconstruct(fmat_a, fmat_b, num_modes)
+            t_recon, m_recon = self._reconstruct(fmat_a, fmat_b, rank, fuse_modes)
 
             residual = np.linalg.norm(tensor.data-t_recon.data)
-            for i in range(num_modes):
+            for i in range(len(mat_modes)):
                 residual += np.linalg.norm(mlst[i].data-m_recon[i].data)
             self.cost.append(abs(residual)/norm)
 
@@ -186,7 +200,7 @@ class CMTF(BaseCPD):
         return fmat_a, fmat_b
 
     @staticmethod
-    def _reconstruct(fmat_a, fmat_b, n_mat):
+    def _reconstruct(fmat_a, fmat_b, rank, fuse_modes):
         """ Reconstruct the tensor and matrix after the coupled factorisation
         Parameters
         ----------
@@ -194,20 +208,25 @@ class CMTF(BaseCPD):
             Multidimensional data obtained from the factorisation
         fmat_b : List(np.ndarray)
             Multidimensional data obtained from the factorisation
-        n_mat : int
-            Number of matrices provided to fuse
+        rank : Tuple(int)
+            Rank of CMTF
+        fuse_modes : List(int)
+            Modes of the tensor to fuse matrices with
         Returns
         -------
         (core_tensor, lrecon) : np.ndarray or List(np.ndarray)
             Reconstructed tensor and list of matrices obtained from the factorisation
         """
+        if not isinstance(rank, tuple):
+            raise TypeError("Parameter `rank` should be passed as a tuple!")
+        if len(rank) != 1:
+            raise ValueError("Parameter `rank` should be tuple with only one value!")
         core_values = np.repeat(np.array([1]), fmat_a[0].shape[1])
-        _r = (fmat_a[0].shape[1], )
-        core_shape = _r * len(fmat_a)
+        core_shape = rank * len(fmat_a)
         core_tensor = super_diag_tensor(core_shape, values=core_values)
         for mode, fmat in enumerate(fmat_a):
             core_tensor.mode_n_product(fmat, mode=mode, inplace=True)
-        lrecon = [Tensor(fmat_a[i].dot(fmat_b[i].T)) for i in range(n_mat)]
+        lrecon = [Tensor(fmat_a[idx].dot(fmat_b[i].T)) for i,idx in enumerate(fuse_modes)]
         return core_tensor, lrecon
 
     def plot(self):
